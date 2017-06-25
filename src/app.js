@@ -73,6 +73,7 @@ function utf8_decode (strData) { // eslint-disable-line camelcase
 var Platform = require('platform');
 var UI = require('ui');
 var ajax = require('ajax');
+var Settings = require('settings'); // for saving stations as favorites
 
 var main = new UI.Card({
   title: isDe?'Abfahrten':"Departures",
@@ -119,6 +120,47 @@ function geoToMVV(lat, lon, callback) {
   });
 }
 
+function getFavs() {
+  // get saved favorites
+  var favs = Settings.option("favorites");
+  // if there are saved favorites, parse them into an array
+  return favs ? JSON.parse(favs) : [];
+}
+
+function setFavs(favs) {
+  // save new favorites
+  Settings.option("favorites", JSON.stringify(favs));
+}
+
+function saveAsFav(stopID, stopName) {
+  // add the new stop to favorites
+  var favs = getFavs();
+  favs.push([stopID, stopName]);
+  setFavs(favs);
+}
+
+function removeFromFavs(stopID) {
+  // remove a stop from favorites
+  var favs = getFavs();
+  var n_favs = favs.length;
+  for (var i =  0; i < n_favs; i++) {
+    if (favs[i][0] == stopID) {
+      favs.splice(i, 1);
+      return;
+    }
+  }
+}
+
+function isFav(stopID) {
+  var favs = getFavs();
+  var n_favs = favs.length;
+  for (var i =  0; i < n_favs; i++) {
+    if (favs[i][0] == stopID)
+      return true;
+  }
+  return false;
+}
+
 var menu = new UI.Menu({
   sections: [{
     title: isDe?"Haltestellen":"nearby stops",
@@ -147,11 +189,14 @@ var start = function() {
         var pins = [];
         for (var i in data.pins) {
           if (data.pins[i].type == "STOP") {
+            var stopID = data.pins[i].id;
+            var favString = isFav(stopID) ? "(*) " : "";
+            var stopTitle = favString.concat(data.pins[i].desc);
             pins.push({
               //title: utf8_decode(data.pins[i].desc),
-              title: data.pins[i].desc,
-              subtitle: data.pins[i].distance + "m "+(isDe?"entfernt":"away"),
-              stationId: data.pins[i].id
+              title: stopTitle,
+              subtitle: data.pins[i].distance + " m "+(isDe?"entfernt":"away"),
+              stationId: stopID
             });
           }
         }
@@ -224,14 +269,25 @@ var stationdetails = function(e) {
 
 menu.on('select', function(e) {
   currentStation = e.item.stationId;
+  var stationTitle = e.item.title.concat(isFav(currentStation) ? " (*)" : "" );
   departures.section(0, {
-    title: e.item.title,
+    title: stationTitle,
     items: [{
       title: isDe?"Lade Abfahrtszeiten...":"Fetching data..."
     }]
   });
   stationdetails(e);
   departures.show();
+});
+
+menu.on('longSelect', function(e) {
+  stationID = e.item.stationId;
+  stationName = e.item.title;
+  if (isFav(stationID)) {
+    removeFromFavs(stationID);
+  } else {
+    saveAsFav(stationID, stationName);
+  }
 });
 
 main.on("click", "select", start);
