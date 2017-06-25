@@ -11,6 +11,8 @@ if (navigator.language.match(/^de/)) {
 }
 var isDe = lang == "DE";
 
+var FAV_SYMBOL = "(*) ";
+
 function utf8_decode (strData) { // eslint-disable-line camelcase
   //  discuss at: http://locutus.io/php/utf8_decode/
   // original by: Webtoolkit.info (http://www.webtoolkit.info/)
@@ -134,6 +136,7 @@ function setFavs(favs) {
 
 function saveAsFav(stopID, stopName) {
   // add the new stop to favorites
+  console.log("new Fav", stopID, stopName);
   var favs = getFavs();
   favs.push([stopID, stopName]);
   setFavs(favs);
@@ -141,11 +144,13 @@ function saveAsFav(stopID, stopName) {
 
 function removeFromFavs(stopID) {
   // remove a stop from favorites
+  console.log("del Fav", stopID);
   var favs = getFavs();
   var n_favs = favs.length;
-  for (var i =  0; i < n_favs; i++) {
+  for (var i = 0; i < n_favs; i++) {
     if (favs[i][0] == stopID) {
       favs.splice(i, 1);
+      setFavs(favs);
       return;
     }
   }
@@ -154,11 +159,27 @@ function removeFromFavs(stopID) {
 function isFav(stopID) {
   var favs = getFavs();
   var n_favs = favs.length;
-  for (var i =  0; i < n_favs; i++) {
+  for (var i = 0; i < n_favs; i++) {
     if (favs[i][0] == stopID)
       return true;
   }
   return false;
+}
+
+function formatTitleWithStar(stopID, stopName) {
+  if (isFav(stopID)) {
+    if (stopName.lastIndexOf(FAV_SYMBOL, 0) === 0) {
+      return stopName;
+    } else {
+      return FAV_SYMBOL + stopName;
+    }
+  } else {
+    if (stopName.lastIndexOf(FAV_SYMBOL, 0) === 0) {
+      return stopName.substring(FAV_SYMBOL.length, stopName.length);
+    } else {
+      return stopName;
+    }
+  }
 }
 
 var menu = new UI.Menu({
@@ -190,8 +211,7 @@ var start = function() {
         for (var i in data.pins) {
           if (data.pins[i].type == "STOP") {
             var stopID = data.pins[i].id;
-            var favString = isFav(stopID) ? "(*) " : "";
-            var stopTitle = favString.concat(data.pins[i].desc);
+            var stopTitle = formatTitleWithStar(stopID, data.pins[i].desc);
             pins.push({
               //title: utf8_decode(data.pins[i].desc),
               title: stopTitle,
@@ -268,8 +288,9 @@ var stationdetails = function(e) {
 };
 
 menu.on('select', function(e) {
-  currentStation = e.item.stationId;
-  var stationTitle = e.item.title.concat(isFav(currentStation) ? " (*)" : "" );
+  console.log("shortClick");
+  var stationID = e.item.stationId;
+  var stationTitle = e.item.title;
   departures.section(0, {
     title: stationTitle,
     items: [{
@@ -281,13 +302,15 @@ menu.on('select', function(e) {
 });
 
 menu.on('longSelect', function(e) {
-  stationID = e.item.stationId;
-  stationName = e.item.title;
+  console.log("longClick");
+  var stationID = e.item.stationId;
+  var stationName = e.item.title;
   if (isFav(stationID)) {
     removeFromFavs(stationID);
   } else {
     saveAsFav(stationID, stationName);
   }
+  e.item.title = formatTitleWithStar(stationID, stationName);
 });
 
 main.on("click", "select", start);
