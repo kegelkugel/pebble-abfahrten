@@ -1,6 +1,6 @@
 # pebble-abfahrten
 
-This is a copy of the repo infanf/pebble-abfahrten.  infanf provides a great Pebble App which shows you the departure times of nearby bus and train stations in Munich (or precisely in the area of the MVV).  This is a modified Pebble app which has the same functionality.  Furthermore, my app features the option to save stops as favorites.  Therefore you do not always need a GPS signal for checking the departures at your most frequent stations.
+This is a copy of the repo infanf/pebble-abfahrten.  infanf provides a great Pebble App which shows you the departure times of nearby bus and train stations in Munich (or precisely in the area of the MVV).  This is a modified Pebble app which has mostly the same functionality, but furthermore, in my app stations can be saved as favorites.  Therefore you do not always need a GPS signal for checking the departures at your most frequent stations.
 
 My app has a differnt name, so that I can distinguish between my version and the version of infanf when both are installed on my phone.
 
