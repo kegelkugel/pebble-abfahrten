@@ -11,6 +11,7 @@ if (navigator.language.match(/^de/)) {
 }
 var isDe = lang == "DE";
 
+// String which is shown in front of the name of a favorite station
 var FAV_SYMBOL = "* ";
 
 function utf8_decode (strData) { // eslint-disable-line camelcase
@@ -75,19 +76,9 @@ function utf8_decode (strData) { // eslint-disable-line camelcase
 var Platform = require('platform');
 var UI = require('ui');
 var ajax = require('ajax');
-var Settings = require('settings'); // for saving stations as favorites
+// Used for saving stations as favorites
+var Settings = require('settings');
 
-var mainMenu = new UI.Menu({
-  sections: [{
-    title: isDe?"Haltestellen":"Saved stops",
-    items: getFavItems()
-  }, {
-    title: isDe?"In der Nähe":"Nearby sops",
-    items: []
-  }]
-});
-
-mainMenu.show();
 /*function geoToMVV(lat, lon) {
   var d_lat = 48.139398-lat; //Relative Abweichung von der Mariensäule
   var m_per_lon = Math.cos(lat/180*Math.PI) * 2 * Math.PI * 6371 / 360 * 1000;
@@ -106,6 +97,7 @@ mainMenu.show();
 }*/
 
 function geoToMVV(lat, lon, callback) {
+  // Uncomment these two lines for testing only
   //lat = 48.139398;
   //lon = 11.578584;
   ajax({
@@ -128,6 +120,7 @@ function getFavs() {
   // get saved favorites
   var favs = Settings.option("favorites");
   // if there are saved favorites, parse them into an array
+  // otherwise return an empty array
   return favs ? JSON.parse(favs) : [];
 }
 
@@ -138,7 +131,6 @@ function setFavs(favs) {
 
 function saveAsFav(stopID, stopName) {
   // add a stop to favorites
-  console.log("new Fav", stopID, stopName);
   var favs = getFavs();
   favs.push([stopID, stopName]);
   setFavs(favs);
@@ -146,12 +138,12 @@ function saveAsFav(stopID, stopName) {
 
 function removeFromFavs(stopID) {
   // remove a stop from favorites
-  console.log("del Fav", stopID);
   var favs = getFavs();
-  var n_favs = favs.length;
-  for (var i = 0; i < n_favs; i++) {
+  for (var i = 0; i < favs.length; i++) {
     if (favs[i][0] == stopID) {
+      // when the stop with the correct ID is found, remove it
       favs.splice(i, 1);
+      // and save the modified list of favorite stops
       setFavs(favs);
       return;
     }
@@ -159,16 +151,19 @@ function removeFromFavs(stopID) {
 }
 
 function isFav(stopID) {
+  // returns true iff a stop with the given ID is saved as a favorite
   var favs = getFavs();
-  var n_favs = favs.length;
-  for (var i = 0; i < n_favs; i++) {
-    if (favs[i][0] == stopID)
+  for (var i = 0; i < favs.length; i++) {
+    if (favs[i][0] == stopID) {
       return true;
+    }
   }
   return false;
 }
 
 function formatTitleWithStar(stopID, stopName) {
+  // if the given stop is a favorite, return its name asterisked (i.e. with a star: * )
+  // otherwise remove the asterisk from the name
   if (isFav(stopID)) {
     if (stopName.lastIndexOf(FAV_SYMBOL, 0) === 0) {
       return stopName;
@@ -185,10 +180,11 @@ function formatTitleWithStar(stopID, stopName) {
 }
 
 function getFavItems() {
+  // return an array of favorite stops
+  // each element of the array has a title and a stationID
   var favs = getFavs();
-  var n_favs = favs.length;
   var items = [];
-  for (var i = 0; i < n_favs; i++) {
+  for (var i = 0; i < favs.length; i++) {
     var item = {title: favs[i][1],
                 stationId: favs[i][0]};
     items.push(item);
@@ -196,14 +192,30 @@ function getFavItems() {
   return items;
 }
 
+
+var updater = 0;
+var currentStation = 0;
+
+
+var mainMenu = new UI.Menu({
+  sections: [{
+    title: isDe?"Haltestellen":"Saved stops",
+    items: []
+  }, {
+    title: isDe?"In der Nähe":"Nearby stops",
+    items: []
+  }]
+});
+
 var departures = new UI.Menu({
   sections: []
 });
 
-var updater = 0;
 
 var start = function() {
-  mainMenu.item(1, 0, {title: isDe?"Suche Position ...":"Fetching location ..."});
+  mainMenu.show();
+  mainMenu.item(1, 0, {title: isDe?"Suche Position ...":"Fetching location ...",
+                       stationID: "INVALID"});
   navigator.geolocation.getCurrentPosition(function(position) {
     geoToMVV(position.coords.latitude , position.coords.longitude, function(mvv){
       //console.debug(mvv.x+":"+mvv.y);
@@ -248,8 +260,6 @@ var parseData = function(data) {
   return jsonData;
 };
 
-var currentStation = 0;
-
 var stationdetails = function(e) {
   ajax({
     url: "http://efa.mvv-muenchen.de/xhr_departures?locationServerActive=1&stateless=1&type_dm=any&useAllStops=1&useRealtime=1&limit=100&mode=direct&zope_command=enquiry%3Adepartures&compact=1&name_dm="+e.item.stationId,
@@ -259,6 +269,9 @@ var stationdetails = function(e) {
     for (var i in jsonData) {
       var now = new Date();
       var then = new Date(""+now.getFullYear()+"-"+(now.getMonth()+1)+"-"+now.getDate()+" "+jsonData[i].time+":00");
+      if (then - now < 0) {
+        continue;
+      }
       var diff = Math.max(0, Math.round((then - now) / 1000 / 60) + 1440) % 1440;
       var type = "R";
       if (jsonData[i].linie.match(/^S\d/)) {
@@ -293,10 +306,13 @@ var stationdetails = function(e) {
   });
 };
 
+
 mainMenu.on('longSelect', function(e) {
-  console.log("longClick", e);
-  var stationID = e.item.stationId;
   var stationName = e.item.title;
+  var stationID = e.item.stationId;
+  if (stationID == "INVALID") {
+    return;
+  }
   if (isFav(stationID)) {
     removeFromFavs(stationID);
   } else {
@@ -306,7 +322,9 @@ mainMenu.on('longSelect', function(e) {
 });
 
 mainMenu.on("select", function(e) {
-  console.log("selected", e);
+  if (e.item.stationId == "INVALID") {
+    return;
+  }
   departures.section(0, {
     title: e.item.title,
     items: [{
@@ -325,5 +343,5 @@ departures.on("click", "back", function(){
   departures.hide();
 });
 
-start();
 
+start();
